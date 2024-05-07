@@ -1,6 +1,6 @@
 # 🛡️ C RAR-NextgenerationAI-expliot 🧪
 
-‏<div dir="rtl">
+<div dir="rtl">
 
 1. **تولید فایل اجرایی با PyInstaller** 🚀
 2. **تولید فایل RAR با یک سند تزیینی و یک payload** 📦
@@ -31,7 +31,7 @@
 
 و بقیه موارد مانند استفاده از تکنیک‌های ضد‌استقرار، تکنیک‌های ضدافشین، تطبیق با سیستم مقصد، مهندسی اجتماعی، اتوماسیون فرآیند حمله، تکنیک‌های اجتناب از شناسایی و غیره نیز در این کد شرح داده شده است.
 
-‏</div>
+</div>
 
 ## Overview 📝
 
@@ -52,3 +52,4 @@ This code acts as a comprehensive toolkit for scientific investigation, covering
 7. **Employing Persistence Techniques for Continuous Access** 🔐: This part includes techniques used to maintain continuous access of the malicious program to the system, such as creating scheduled tasks and registry keys.
 
 And the rest of the techniques such as using anti-forensics techniques, anti-sandbox techniques, adapting to the target system, social engineering, automating the attack process, evasion techniques, etc., are also described in this code.
+```
