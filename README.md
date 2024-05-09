@@ -1,7 +1,7 @@
 ## 🛡️RAR-NextgenerationAI-expliot🧪
  
 <div dir="rtl">
-
+ 
 1. **تولید فایل اجرایی با PyInstaller** 🚀
 2. **تولید فایل RAR با یک سند تزیینی و یک payload** 📦
 3. **انجام تزریق فرایند** 💉
